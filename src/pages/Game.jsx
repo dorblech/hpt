@@ -6,6 +6,8 @@ import GameOver from '../components/game/GameOver';
 import AchievementsPanel from '../components/game/AchievementsPanel';
 import UpgradesPanel from '../components/game/UpgradesPanel';
 import ComboDisplay from '../components/game/ComboDisplay';
+import LeaderboardPanel from '../components/game/LeaderboardPanel';
+import { base44 } from '@/api/base44Client';
 
 export default function Game() {
   const [gameState, setGameState] = useState('menu'); // menu | playing | over
@@ -45,6 +47,7 @@ export default function Game() {
   });
   const [showAchievements, setShowAchievements] = useState(false);
   const [showUpgrades, setShowUpgrades] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const handleStart = useCallback(() => {
     setScore(0);
@@ -57,7 +60,7 @@ export default function Game() {
     setGameState('playing');
   }, []);
 
-  const handleGameOver = useCallback((finalScore, earnedCoins) => {
+  const handleGameOver = useCallback(async (finalScore, earnedCoins) => {
     if (finalScore > highScore) {
       setHighScore(finalScore);
       localStorage.setItem('footballDomeHighScore', finalScore.toString());
@@ -65,8 +68,22 @@ export default function Game() {
     const newCoins = coins + earnedCoins;
     setCoins(newCoins);
     localStorage.setItem('footballDomeCoins', newCoins.toString());
+    
+    // Save to global leaderboard
+    try {
+      const user = await base44.auth.me();
+      await base44.entities.HighScore.create({
+        player_name: user?.full_name || 'שחקן אנונימי',
+        score: finalScore,
+        coins: earnedCoins,
+        level_reached: currentLevel?.level || 1,
+      });
+    } catch (error) {
+      console.log('Failed to save high score:', error);
+    }
+    
     setGameState('over');
-  }, [highScore, coins]);
+  }, [highScore, coins, currentLevel]);
 
   const handleScoreChange = useCallback((newScore) => {
     setScore(newScore);
@@ -190,6 +207,7 @@ export default function Game() {
             coins={coins}
             onShowAchievements={() => setShowAchievements(true)}
             onShowUpgrades={() => setShowUpgrades(true)}
+            onShowLeaderboard={() => setShowLeaderboard(true)}
           />
         )}
         
@@ -215,6 +233,12 @@ export default function Game() {
             coins={coins}
             onUpgrade={handleUpgrade}
             onClose={() => setShowUpgrades(false)}
+          />
+        )}
+
+        {showLeaderboard && (
+          <LeaderboardPanel 
+            onClose={() => setShowLeaderboard(false)}
           />
         )}
       </div>

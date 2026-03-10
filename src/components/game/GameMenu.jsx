@@ -1,11 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { Trophy, Sparkles } from 'lucide-react';
+import { Trophy, Sparkles, Users } from 'lucide-react';
 
 const LOGO_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69b06431da918bf146ec7aa5/c142c3bc8_image.png';
 
-export default function GameMenu({ onStart, highScore, coins, onShowAchievements, onShowUpgrades }) {
+export default function GameMenu({ onStart, highScore, coins, onShowAchievements, onShowUpgrades, onShowLeaderboard }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/70 backdrop-blur-sm">
       <motion.div 
@@ -47,7 +47,15 @@ export default function GameMenu({ onStart, highScore, coins, onShowAchievements
             🚀 התחל משחק
           </Button>
           
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap justify-center">
+            <Button 
+              onClick={onShowLeaderboard}
+              variant="outline"
+              className="font-rubik font-bold bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 border-yellow-500/50 hover:from-yellow-500/30 hover:to-yellow-600/30"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              לוח תוצאות
+            </Button>
             <Button 
               onClick={onShowAchievements}
               variant="outline"
