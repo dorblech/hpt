@@ -1,0 +1,547 @@
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import useGameLoop from './useGameLoop';
+
+// Image URLs
+const STADIUM_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/2f3681176_image.png';
+const PLAYER_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/02a4af239_image.png';
+const SCARF_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/66fcc071c_image.png';
+const RETRO_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/d8bfe6ea0_image.png';
+const LUZON_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/a5e297469_image.png';
+
+const GAME_CONFIG = {
+  PLAYER_SPEED: 6,
+  BALL_SPEED: 8,
+  MISSILE_BASE_SPEED: 2,
+  MISSILE_SPAWN_INTERVAL: 90,
+  BONUS_SPAWN_CHANCE: 0.15,
+  SHIELD_DURATION: 600,
+  VINTAGE_DURATION: 480,
+  BALL_RADIUS: 8,
+  VINTAGE_BALL_RADIUS: 16,
+  MISSILE_WIDTH: 30,
+  MISSILE_HEIGHT: 60,
+  PLAYER_WIDTH: 80,
+  PLAYER_HEIGHT: 100,
+  BONUS_SIZE: 50,
+  SHOOT_COOLDOWN: 12,
+};
+
+function loadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, onBonusChange, gameState }) {
+  const canvasRef = useRef(null);
+  const stateRef = useRef(null);
+  const imagesRef = useRef({});
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  // Load all images
+  useEffect(() => {
+    Promise.all([
+      loadImage(STADIUM_IMG),
+      loadImage(PLAYER_IMG),
+      loadImage(SCARF_IMG),
+      loadImage(RETRO_IMG),
+      loadImage(LUZON_IMG),
+    ]).then(([stadium, player, scarf, retro, luzon]) => {
+      imagesRef.current = { stadium, player, scarf, retro, luzon };
+      setImagesLoaded(true);
+    });
+  }, []);
+
+  // Initialize game state
+  useEffect(() => {
+    if (gameState !== 'playing' || !imagesLoaded) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    stateRef.current = {
+      player: { x: canvas.width / 2, y: canvas.height - 120 },
+      balls: [],
+      missiles: [],
+      bonuses: [],
+      explosions: [],
+      score: 0,
+      lives: 3,
+      hasShield: false,
+      hasVintage: false,
+      shieldTimer: 0,
+      vintageTimer: 0,
+      spawnTimer: 0,
+      shootCooldown: 0,
+      difficulty: 1,
+      frameCount: 0,
+      keys: {},
+      showMangal: false,
+      mangalTimer: 0,
+      touching: false,
+      touchX: 0,
+    };
+  }, [gameState, imagesLoaded]);
+
+  // Input handlers
+  useEffect(() => {
+    if (gameState !== 'playing') return;
+
+    const handleKeyDown = (e) => {
+      if (!stateRef.current) return;
+      stateRef.current.keys[e.code] = true;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        shootBall();
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (!stateRef.current) return;
+      stateRef.current.keys[e.code] = false;
+    };
+
+    const handleTouchStart = (e) => {
+      if (!stateRef.current) return;
+      const touch = e.touches[0];
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      stateRef.current.touching = true;
+      stateRef.current.touchX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+      shootBall();
+    };
+
+    const handleTouchMove = (e) => {
+      if (!stateRef.current) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      stateRef.current.touchX = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    };
+
+    const handleTouchEnd = () => {
+      if (!stateRef.current) return;
+      stateRef.current.touching = false;
+    };
+
+    const handleClick = (e) => {
+      if (!stateRef.current) return;
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
+      stateRef.current.player.x = clickX;
+      shootBall();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    const canvas = canvasRef.current;
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd);
+    canvas.addEventListener('click', handleClick);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('click', handleClick);
+    };
+  }, [gameState]);
+
+  const shootBall = useCallback(() => {
+    const s = stateRef.current;
+    if (!s || s.shootCooldown > 0) return;
+    
+    const radius = s.hasVintage ? GAME_CONFIG.VINTAGE_BALL_RADIUS : GAME_CONFIG.BALL_RADIUS;
+    s.balls.push({
+      x: s.player.x,
+      y: s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 2,
+      radius,
+      isVintage: s.hasVintage,
+      speed: GAME_CONFIG.BALL_SPEED,
+    });
+    s.shootCooldown = GAME_CONFIG.SHOOT_COOLDOWN;
+  }, []);
+
+  // Resize canvas
+  useEffect(() => {
+    const resize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const parent = canvas.parentElement;
+      canvas.width = Math.min(parent.clientWidth, 600);
+      canvas.height = Math.min(parent.clientHeight, 900);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+
+  // Game loop
+  useGameLoop(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    const s = stateRef.current;
+    const imgs = imagesRef.current;
+    
+    if (!ctx || !s || gameState !== 'playing') return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    
+    s.frameCount++;
+
+    // --- UPDATE ---
+    
+    // Player movement
+    if (s.keys['ArrowLeft'] || s.keys['KeyA']) {
+      s.player.x -= GAME_CONFIG.PLAYER_SPEED;
+    }
+    if (s.keys['ArrowRight'] || s.keys['KeyD']) {
+      s.player.x += GAME_CONFIG.PLAYER_SPEED;
+    }
+    if (s.touching) {
+      const diff = s.touchX - s.player.x;
+      s.player.x += Math.sign(diff) * Math.min(Math.abs(diff), GAME_CONFIG.PLAYER_SPEED);
+    }
+    s.player.x = Math.max(GAME_CONFIG.PLAYER_WIDTH / 2, Math.min(W - GAME_CONFIG.PLAYER_WIDTH / 2, s.player.x));
+
+    // Shoot cooldown
+    if (s.shootCooldown > 0) s.shootCooldown--;
+
+    // Difficulty scaling
+    s.difficulty = 1 + Math.floor(s.score / 50) * 0.3;
+
+    // Spawn missiles / bonuses
+    s.spawnTimer++;
+    const spawnInterval = Math.max(30, GAME_CONFIG.MISSILE_SPAWN_INTERVAL - s.difficulty * 8);
+    if (s.spawnTimer >= spawnInterval) {
+      s.spawnTimer = 0;
+      
+      if (Math.random() < GAME_CONFIG.BONUS_SPAWN_CHANCE) {
+        // Spawn bonus
+        const bonusTypes = ['scarf', 'retro', 'luzon'];
+        const type = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
+        s.bonuses.push({
+          x: Math.random() * (W - 60) + 30,
+          y: -GAME_CONFIG.BONUS_SIZE,
+          type,
+          speed: 2 + Math.random(),
+        });
+      } else {
+        // Spawn missile
+        s.missiles.push({
+          x: Math.random() * (W - 40) + 20,
+          y: -GAME_CONFIG.MISSILE_HEIGHT,
+          speed: GAME_CONFIG.MISSILE_BASE_SPEED + Math.random() * s.difficulty,
+          wobble: Math.random() * 2 - 1,
+        });
+      }
+    }
+
+    // Update balls
+    s.balls = s.balls.filter(ball => {
+      ball.y -= ball.speed;
+      return ball.y > -20;
+    });
+
+    // Update missiles
+    s.missiles = s.missiles.filter(missile => {
+      missile.y += missile.speed;
+      missile.x += Math.sin(s.frameCount * 0.05) * missile.wobble;
+
+      // Check collision with balls
+      for (let i = s.balls.length - 1; i >= 0; i--) {
+        const ball = s.balls[i];
+        const dx = ball.x - missile.x;
+        const dy = ball.y - missile.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const hitRadius = ball.radius + GAME_CONFIG.MISSILE_WIDTH / 2;
+        
+        if (dist < hitRadius) {
+          // Missile destroyed!
+          s.balls.splice(i, 1);
+          s.score += 10;
+          onScoreChange(s.score);
+          s.explosions.push({ x: missile.x, y: missile.y, timer: 30, size: 40 });
+          return false;
+        }
+      }
+
+      // Missile reached player
+      if (missile.y > s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 2) {
+        const dx = Math.abs(missile.x - s.player.x);
+        if (dx < (GAME_CONFIG.PLAYER_WIDTH + GAME_CONFIG.MISSILE_WIDTH) / 2) {
+          if (s.hasShield) {
+            s.explosions.push({ x: missile.x, y: missile.y, timer: 30, size: 40 });
+            return false;
+          }
+          s.lives--;
+          onLivesChange(s.lives);
+          s.explosions.push({ x: missile.x, y: missile.y, timer: 40, size: 60 });
+          if (s.lives <= 0) {
+            onGameOver(s.score);
+          }
+          return false;
+        }
+      }
+
+      // Off screen
+      return missile.y < H + 20;
+    });
+
+    // Update bonuses
+    s.bonuses = s.bonuses.filter(bonus => {
+      bonus.y += bonus.speed;
+      
+      // Check collision with balls
+      for (let i = s.balls.length - 1; i >= 0; i--) {
+        const ball = s.balls[i];
+        const dx = ball.x - bonus.x;
+        const dy = ball.y - bonus.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < ball.radius + GAME_CONFIG.BONUS_SIZE / 2) {
+          s.balls.splice(i, 1);
+          
+          if (bonus.type === 'scarf') {
+            s.hasShield = true;
+            s.shieldTimer = GAME_CONFIG.SHIELD_DURATION;
+            onBonusChange({ hasShield: true, hasVintage: s.hasVintage, shieldTimer: s.shieldTimer, vintageTimer: s.vintageTimer });
+          } else if (bonus.type === 'retro') {
+            s.hasVintage = true;
+            s.vintageTimer = GAME_CONFIG.VINTAGE_DURATION;
+            onBonusChange({ hasShield: s.hasShield, hasVintage: true, shieldTimer: s.shieldTimer, vintageTimer: s.vintageTimer });
+          } else if (bonus.type === 'luzon') {
+            // Destroy all missiles
+            s.missiles.forEach(m => {
+              s.explosions.push({ x: m.x, y: m.y, timer: 30, size: 50 });
+            });
+            s.score += s.missiles.length * 10;
+            onScoreChange(s.score);
+            s.missiles = [];
+            s.showMangal = true;
+            s.mangalTimer = 120;
+          }
+          
+          s.explosions.push({ x: bonus.x, y: bonus.y, timer: 20, size: 30, color: 'gold' });
+          return false;
+        }
+      }
+
+      return bonus.y < H + 30;
+    });
+
+    // Timer updates
+    if (s.hasShield) {
+      s.shieldTimer--;
+      if (s.shieldTimer <= 0) {
+        s.hasShield = false;
+        onBonusChange({ hasShield: false, hasVintage: s.hasVintage, shieldTimer: 0, vintageTimer: s.vintageTimer });
+      }
+    }
+    if (s.hasVintage) {
+      s.vintageTimer--;
+      if (s.vintageTimer <= 0) {
+        s.hasVintage = false;
+        onBonusChange({ hasShield: s.hasShield, hasVintage: false, shieldTimer: s.shieldTimer, vintageTimer: 0 });
+      }
+    }
+    if (s.showMangal) {
+      s.mangalTimer--;
+      if (s.mangalTimer <= 0) s.showMangal = false;
+    }
+
+    // Update explosions
+    s.explosions = s.explosions.filter(e => {
+      e.timer--;
+      e.size += 2;
+      return e.timer > 0;
+    });
+
+    // --- DRAW ---
+    ctx.clearRect(0, 0, W, H);
+
+    // Background stadium
+    if (imgs.stadium) {
+      ctx.drawImage(imgs.stadium, 0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,10,0.4)';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.fillStyle = '#0a1628';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Draw missiles
+    s.missiles.forEach(missile => {
+      // Missile body
+      ctx.save();
+      ctx.translate(missile.x, missile.y);
+      
+      // Missile shape
+      ctx.fillStyle = '#666';
+      ctx.beginPath();
+      ctx.moveTo(0, -GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(GAME_CONFIG.MISSILE_WIDTH / 2, GAME_CONFIG.MISSILE_HEIGHT / 4);
+      ctx.lineTo(GAME_CONFIG.MISSILE_WIDTH / 2, GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(-GAME_CONFIG.MISSILE_WIDTH / 2, GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(-GAME_CONFIG.MISSILE_WIDTH / 2, GAME_CONFIG.MISSILE_HEIGHT / 4);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Nose cone
+      ctx.fillStyle = '#cc0000';
+      ctx.beginPath();
+      ctx.moveTo(0, -GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(8, -GAME_CONFIG.MISSILE_HEIGHT / 4);
+      ctx.lineTo(-8, -GAME_CONFIG.MISSILE_HEIGHT / 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Flames
+      const flameSize = 10 + Math.random() * 10;
+      ctx.fillStyle = '#ff6600';
+      ctx.beginPath();
+      ctx.moveTo(-8, GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(8, GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(0, GAME_CONFIG.MISSILE_HEIGHT / 2 + flameSize);
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.fillStyle = '#ffcc00';
+      ctx.beginPath();
+      ctx.moveTo(-4, GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(4, GAME_CONFIG.MISSILE_HEIGHT / 2);
+      ctx.lineTo(0, GAME_CONFIG.MISSILE_HEIGHT / 2 + flameSize * 0.6);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
+    });
+
+    // Draw bonuses
+    s.bonuses.forEach(bonus => {
+      const img = bonus.type === 'scarf' ? imgs.scarf : bonus.type === 'retro' ? imgs.retro : imgs.luzon;
+      if (img) {
+        const sz = GAME_CONFIG.BONUS_SIZE;
+        ctx.save();
+        // Glow
+        ctx.shadowColor = bonus.type === 'luzon' ? '#ff4444' : '#ffcc00';
+        ctx.shadowBlur = 15 + Math.sin(s.frameCount * 0.1) * 5;
+        ctx.drawImage(img, bonus.x - sz / 2, bonus.y - sz / 2, sz, sz);
+        ctx.restore();
+      }
+    });
+
+    // Draw balls
+    s.balls.forEach(ball => {
+      ctx.save();
+      if (ball.isVintage) {
+        // Vintage ball - bigger, golden
+        ctx.fillStyle = '#d4a017';
+        ctx.strokeStyle = '#8b6914';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        // Pattern
+        ctx.strokeStyle = '#8b6914';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // Normal football
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Pentagon pattern
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+
+    // Draw player
+    if (imgs.player) {
+      const pw = GAME_CONFIG.PLAYER_WIDTH;
+      const ph = GAME_CONFIG.PLAYER_HEIGHT;
+      
+      // Shield glow
+      if (s.hasShield) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(59, 130, 246, ${0.5 + Math.sin(s.frameCount * 0.1) * 0.3})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(s.player.x, s.player.y - ph / 4, pw * 0.8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(59, 130, 246, 0.1)`;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.drawImage(imgs.player, s.player.x - pw / 2, s.player.y - ph, pw, ph);
+    }
+
+    // Draw explosions
+    s.explosions.forEach(e => {
+      ctx.save();
+      const alpha = e.timer / 40;
+      const color = e.color === 'gold' ? `rgba(255, 200, 0, ${alpha})` : `rgba(255, 100, 0, ${alpha})`;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = `rgba(255, 255, 200, ${alpha * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.size * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Draw "תפתחו מנגלים" text
+    if (s.showMangal) {
+      ctx.save();
+      const alpha = s.mangalTimer / 120;
+      ctx.fillStyle = `rgba(255, 200, 0, ${alpha})`;
+      ctx.font = `bold ${Math.min(W * 0.08, 40)}px Rubik, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(255, 100, 0, 0.8)';
+      ctx.shadowBlur = 20;
+      ctx.fillText('🔥 תפתחו מנגלים! 🔥', W / 2, H / 3);
+      ctx.restore();
+    }
+  });
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center">
+      {!imagesLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background z-30">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="ml-3 font-rubik text-white">טוען תמונות...</span>
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        className="block max-w-full max-h-full rounded-lg"
+        style={{ touchAction: 'none' }}
+      />
+    </div>
+  );
+}
