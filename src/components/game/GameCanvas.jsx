@@ -15,8 +15,8 @@ const GAME_CONFIG = {
   VINTAGE_BALL_RADIUS: 16,
   MISSILE_WIDTH: 30,
   MISSILE_HEIGHT: 60,
-  PLAYER_WIDTH: 80,
-  PLAYER_HEIGHT: 100,
+  PLAYER_WIDTH: 100,
+  PLAYER_HEIGHT: 130,
   BONUS_SIZE: 50,
   SHOOT_COOLDOWN: 12,
   SHIELD_DURATION: 600,
@@ -643,6 +643,9 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
 
       ctx.save();
       
+      // Set blend mode to remove black background
+      ctx.globalCompositeOperation = 'screen';
+      
       // Kick animation - tilt player slightly
       if (s.kickAnimation > 0) {
         const kickAngle = (s.kickAnimation > 10 ? (20 - s.kickAnimation) : s.kickAnimation) * 0.05;
@@ -662,6 +665,9 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       } else {
         ctx.drawImage(imgs.player, s.player.x - pw / 2, s.player.y - ph, pw, ph);
       }
+      
+      // Reset blend mode
+      ctx.globalCompositeOperation = 'source-over';
       
       ctx.restore();
     }
