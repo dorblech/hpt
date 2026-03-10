@@ -226,7 +226,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     const radius = s.hasVintage ? GAME_CONFIG.VINTAGE_BALL_RADIUS : GAME_CONFIG.BALL_RADIUS;
     s.ballAtFoot = {
       x: s.player.x,
-      y: s.player.y - 15, // Position at feet level
+      y: s.player.y + 20, // Position at foot level (bottom of player)
       radius,
       isVintage: s.hasVintage,
     };
@@ -324,7 +324,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     // Update ball at foot position
     if (s.ballAtFoot) {
       s.ballAtFoot.x = s.player.x;
-      s.ballAtFoot.y = s.player.y - 15; // Keep at feet level
+      s.ballAtFoot.y = s.player.y + 20; // At foot level (bottom of player)
     }
 
     // Level progression and boss mode
@@ -687,7 +687,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     if (s.ballAtFoot) {
       const ball = s.ballAtFoot;
       const kickProgress = 1 - (s.kickAnimation / 20);
-      const offsetY = kickProgress * 15;
+      const offsetY = kickProgress * 30; // Kick upward motion
       
       ctx.save();
       if (ball.isVintage) {
