@@ -641,6 +641,32 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
         ctx.restore();
       }
 
+      // Draw player to offscreen canvas with chroma key to remove dark background
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = pw;
+      tempCanvas.height = ph;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      // Draw player image
+      tempCtx.drawImage(imgs.player, 0, 0, pw, ph);
+      
+      // Get image data and remove dark pixels
+      const imageData = tempCtx.getImageData(0, 0, pw, ph);
+      const data = imageData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // Remove very dark pixels (near black background)
+        if (r < 30 && g < 30 && b < 30) {
+          data[i + 3] = 0; // Make transparent
+        }
+      }
+      
+      tempCtx.putImageData(imageData, 0, 0);
+      
       ctx.save();
       
       // Kick animation - tilt player slightly
@@ -648,7 +674,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
         const kickAngle = (s.kickAnimation > 10 ? (20 - s.kickAnimation) : s.kickAnimation) * 0.05;
         ctx.translate(s.player.x, s.player.y - ph / 2);
         ctx.rotate(kickAngle);
-        ctx.drawImage(imgs.player, -pw / 2, -ph / 2, pw, ph);
+        ctx.drawImage(tempCanvas, -pw / 2, -ph / 2, pw, ph);
         
         // Draw kicking leg motion blur
         if (s.kickAnimation > 8 && s.kickAnimation < 15) {
@@ -660,7 +686,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
           ctx.globalAlpha = 1;
         }
       } else {
-        ctx.drawImage(imgs.player, s.player.x - pw / 2, s.player.y - ph, pw, ph);
+        ctx.drawImage(tempCanvas, s.player.x - pw / 2, s.player.y - ph, pw, ph);
       }
       
       ctx.restore();
