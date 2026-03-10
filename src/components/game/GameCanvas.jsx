@@ -643,18 +643,12 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
 
       ctx.save();
       
-      // Use lighten blend mode to remove black background
-      ctx.globalCompositeOperation = 'lighten';
-      
       // Kick animation - tilt player slightly
       if (s.kickAnimation > 0) {
         const kickAngle = (s.kickAnimation > 10 ? (20 - s.kickAnimation) : s.kickAnimation) * 0.05;
         ctx.translate(s.player.x, s.player.y - ph / 2);
         ctx.rotate(kickAngle);
         ctx.drawImage(imgs.player, -pw / 2, -ph / 2, pw, ph);
-        
-        // Reset blend mode for motion blur
-        ctx.globalCompositeOperation = 'source-over';
         
         // Draw kicking leg motion blur
         if (s.kickAnimation > 8 && s.kickAnimation < 15) {
@@ -668,9 +662,6 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       } else {
         ctx.drawImage(imgs.player, s.player.x - pw / 2, s.player.y - ph, pw, ph);
       }
-      
-      // Reset blend mode
-      ctx.globalCompositeOperation = 'source-over';
       
       ctx.restore();
     }
