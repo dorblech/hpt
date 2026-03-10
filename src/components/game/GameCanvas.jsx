@@ -865,25 +865,49 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       const boss = s.boss;
       
       ctx.save();
-      // Boss body - giant missile
+      // Boss body - giant missile with Iranian flag
       ctx.fillStyle = '#ff0000';
       ctx.beginPath();
       ctx.arc(boss.x, boss.y, 50, 0, Math.PI * 2);
       ctx.fill();
       
-      ctx.fillStyle = '#cc0000';
+      // Iranian flag stripes (green, white, red)
+      const stripeHeight = 100 / 3;
+      
+      // Green stripe (top)
+      ctx.fillStyle = '#239F40';
+      ctx.fillRect(boss.x - 45, boss.y - 45, 90, stripeHeight);
+      
+      // White stripe (middle) with emblem
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(boss.x - 45, boss.y - 45 + stripeHeight, 90, stripeHeight);
+      
+      // Red stripe (bottom)
+      ctx.fillStyle = '#DA0000';
+      ctx.fillRect(boss.x - 45, boss.y - 45 + stripeHeight * 2, 90, stripeHeight);
+      
+      // Red emblem in center
+      ctx.fillStyle = '#DA0000';
+      ctx.font = 'bold 30px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('☪', boss.x, boss.y);
+      
+      // Clip to circle
+      ctx.globalCompositeOperation = 'destination-in';
       ctx.beginPath();
-      ctx.arc(boss.x, boss.y, 35, 0, Math.PI * 2);
+      ctx.arc(boss.x, boss.y, 50, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
       
       // Boss eyes
-      ctx.fillStyle = '#ffff00';
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
       ctx.arc(boss.x - 15, boss.y - 10, 8, 0, Math.PI * 2);
       ctx.arc(boss.x + 15, boss.y - 10, 8, 0, Math.PI * 2);
       ctx.fill();
       
-      ctx.fillStyle = '#000';
+      ctx.fillStyle = '#ff0000';
       ctx.beginPath();
       ctx.arc(boss.x - 15, boss.y - 10, 4, 0, Math.PI * 2);
       ctx.arc(boss.x + 15, boss.y - 10, 4, 0, Math.PI * 2);
