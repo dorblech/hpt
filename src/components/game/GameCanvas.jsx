@@ -9,7 +9,7 @@ const RETRO_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/pu
 const LUZON_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/a5e297469_image.png';
 
 const GAME_CONFIG = {
-  PLAYER_SPEED: 6,
+  BASE_PLAYER_SPEED: 6,
   BALL_SPEED: 8,
   BALL_RADIUS: 8,
   VINTAGE_BALL_RADIUS: 16,
@@ -90,7 +90,7 @@ function loadImage(src) {
   });
 }
 
-export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, onBonusChange, onLevelChange, gameState }) {
+export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, onBonusChange, onLevelChange, onComboChange, onBossDefeated, onBonusCollected, upgrades, combo, multiplier, gameState }) {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
   const imagesRef = useRef({});
@@ -140,6 +140,12 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       currentLevel: 0,
       kickAnimation: 0,
       ballAtFoot: null,
+      combo: 0,
+      multiplier: 1,
+      missedShot: false,
+      bossMode: false,
+      boss: null,
+      earnedCoins: 0,
     };
   }, [gameState, imagesLoaded]);
 
@@ -257,16 +263,19 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
 
     // --- UPDATE ---
     
-    // Player movement
+    // Player movement (with speed upgrade)
+    const speedMultiplier = 1 + (upgrades?.speed || 0) * 0.2;
+    const playerSpeed = GAME_CONFIG.BASE_PLAYER_SPEED * speedMultiplier;
+    
     if (s.keys['ArrowLeft'] || s.keys['KeyA']) {
-      s.player.x -= GAME_CONFIG.PLAYER_SPEED;
+      s.player.x -= playerSpeed;
     }
     if (s.keys['ArrowRight'] || s.keys['KeyD']) {
-      s.player.x += GAME_CONFIG.PLAYER_SPEED;
+      s.player.x += playerSpeed;
     }
     if (s.touching) {
       const diff = s.touchX - s.player.x;
-      s.player.x += Math.sign(diff) * Math.min(Math.abs(diff), GAME_CONFIG.PLAYER_SPEED);
+      s.player.x += Math.sign(diff) * Math.min(Math.abs(diff), playerSpeed);
     }
     s.player.x = Math.max(GAME_CONFIG.PLAYER_WIDTH / 2, Math.min(W - GAME_CONFIG.PLAYER_WIDTH / 2, s.player.x));
 
@@ -278,13 +287,33 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       s.kickAnimation--;
       if (s.kickAnimation === 10 && s.ballAtFoot) {
         // Release ball at mid-kick
-        s.balls.push({
-          x: s.ballAtFoot.x,
-          y: s.ballAtFoot.y - 10,
-          radius: s.ballAtFoot.radius,
-          isVintage: s.ballAtFoot.isVintage,
-          speed: GAME_CONFIG.BALL_SPEED,
-        });
+        const ballRadius = s.ballAtFoot.radius * (1 + (upgrades?.bigBall || 0) * 0.3);
+        
+        // Double shot upgrade
+        if (upgrades?.doubleShot >= 1) {
+          s.balls.push({
+            x: s.ballAtFoot.x - 15,
+            y: s.ballAtFoot.y - 10,
+            radius: ballRadius,
+            isVintage: s.ballAtFoot.isVintage,
+            speed: GAME_CONFIG.BALL_SPEED,
+          });
+          s.balls.push({
+            x: s.ballAtFoot.x + 15,
+            y: s.ballAtFoot.y - 10,
+            radius: ballRadius,
+            isVintage: s.ballAtFoot.isVintage,
+            speed: GAME_CONFIG.BALL_SPEED,
+          });
+        } else {
+          s.balls.push({
+            x: s.ballAtFoot.x,
+            y: s.ballAtFoot.y - 10,
+            radius: ballRadius,
+            isVintage: s.ballAtFoot.isVintage,
+            speed: GAME_CONFIG.BALL_SPEED,
+          });
+        }
         s.ballAtFoot = null;
       }
       if (s.kickAnimation === 0) {
@@ -298,13 +327,26 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       s.ballAtFoot.y = s.player.y - 15; // Keep at feet level
     }
 
-    // Level progression
+    // Level progression and boss mode
     const levelConfig = getLevelConfig(s.score);
     const newLevel = levelConfig.level - 1;
     if (newLevel !== s.currentLevel) {
       s.currentLevel = newLevel;
       if (onLevelChange) {
         onLevelChange(levelConfig);
+      }
+      
+      // Boss every 5 levels
+      if ((newLevel + 1) % 5 === 0 && !s.bossMode) {
+        s.bossMode = true;
+        s.boss = {
+          x: W / 2,
+          y: 100,
+          health: 10,
+          maxHealth: 10,
+          direction: 1,
+          shootTimer: 0,
+        };
       }
     }
 
@@ -338,7 +380,13 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     // Update balls
     s.balls = s.balls.filter(ball => {
       ball.y -= ball.speed;
-      return ball.y > -20;
+      
+      // Check if ball missed (went off screen without hitting anything)
+      if (ball.y < -20) {
+        s.missedShot = true;
+        return false;
+      }
+      return true;
     });
 
     // Update missiles
@@ -357,8 +405,16 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
         if (dist < hitRadius) {
           // Missile destroyed!
           s.balls.splice(i, 1);
-          s.score += 10;
+          
+          // Combo system
+          s.combo++;
+          s.multiplier = Math.min(Math.floor(s.combo / 5) + 1, 5);
+          const points = 10 * s.multiplier;
+          s.score += points;
+          s.earnedCoins += Math.floor(points / 10);
           onScoreChange(s.score);
+          onComboChange(s.combo, s.multiplier);
+          
           s.explosions.push({ x: missile.x, y: missile.y, timer: 30, size: 40 });
           return false;
         }
@@ -368,15 +424,24 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       if (missile.y > s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 2) {
         const dx = Math.abs(missile.x - s.player.x);
         if (dx < (GAME_CONFIG.PLAYER_WIDTH + GAME_CONFIG.MISSILE_WIDTH) / 2) {
-          if (s.hasShield) {
+          const hasPermaShield = upgrades?.permanentShield >= 1;
+          if (s.hasShield || hasPermaShield) {
             s.explosions.push({ x: missile.x, y: missile.y, timer: 30, size: 40 });
+            if (!hasPermaShield) {
+              s.hasShield = false;
+              s.shieldTimer = 0;
+              onBonusChange({ hasShield: false, hasVintage: s.hasVintage, shieldTimer: 0, vintageTimer: s.vintageTimer });
+            }
             return false;
           }
           s.lives--;
+          s.combo = 0;
+          s.multiplier = 1;
+          onComboChange(0, 1);
           onLivesChange(s.lives);
           s.explosions.push({ x: missile.x, y: missile.y, timer: 40, size: 60 });
           if (s.lives <= 0) {
-            onGameOver(s.score);
+            onGameOver(s.score, s.earnedCoins);
           }
           return false;
         }
@@ -404,11 +469,14 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
             s.hasShield = true;
             s.shieldTimer = GAME_CONFIG.SHIELD_DURATION;
             onBonusChange({ hasShield: true, hasVintage: s.hasVintage, shieldTimer: s.shieldTimer, vintageTimer: s.vintageTimer });
+            onBonusCollected('scarf');
           } else if (bonus.type === 'retro') {
             s.hasVintage = true;
             s.vintageTimer = GAME_CONFIG.VINTAGE_DURATION;
             onBonusChange({ hasShield: s.hasShield, hasVintage: true, shieldTimer: s.shieldTimer, vintageTimer: s.vintageTimer });
+            onBonusCollected('retro');
           } else if (bonus.type === 'luzon') {
+            onBonusCollected('luzon');
             // Destroy all missiles with radial explosion
             const centerX = bonus.x;
             const centerY = bonus.y;
@@ -449,6 +517,70 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
 
       return bonus.y < H + 30;
     });
+
+    // Update boss
+    if (s.bossMode && s.boss) {
+      const boss = s.boss;
+      
+      // Boss movement
+      boss.x += boss.direction * 2;
+      if (boss.x < 100 || boss.x > W - 100) {
+        boss.direction *= -1;
+      }
+      
+      // Boss shooting
+      boss.shootTimer++;
+      if (boss.shootTimer >= 60) {
+        boss.shootTimer = 0;
+        s.missiles.push({
+          x: boss.x,
+          y: boss.y + 40,
+          speed: 2,
+          wobble: 0,
+          wobblePhase: 0,
+        });
+      }
+      
+      // Check collision with balls
+      for (let i = s.balls.length - 1; i >= 0; i--) {
+        const ball = s.balls[i];
+        const dx = ball.x - boss.x;
+        const dy = ball.y - boss.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < ball.radius + 50) {
+          s.balls.splice(i, 1);
+          boss.health--;
+          s.combo++;
+          s.multiplier = Math.min(Math.floor(s.combo / 5) + 1, 5);
+          const points = 20 * s.multiplier;
+          s.score += points;
+          s.earnedCoins += Math.floor(points / 10);
+          onScoreChange(s.score);
+          onComboChange(s.combo, s.multiplier);
+          s.explosions.push({ x: boss.x, y: boss.y, timer: 20, size: 30, color: 'boss' });
+          
+          if (boss.health <= 0) {
+            // Boss defeated!
+            s.bossMode = false;
+            s.boss = null;
+            s.score += 100;
+            s.earnedCoins += 20;
+            onScoreChange(s.score);
+            onBossDefeated();
+            s.explosions.push({ x: boss.x, y: boss.y, timer: 60, size: 120, color: 'boss' });
+          }
+        }
+      }
+    }
+
+    // Reset combo if missed shot
+    if (s.missedShot) {
+      s.combo = 0;
+      s.multiplier = 1;
+      onComboChange(0, 1);
+      s.missedShot = false;
+    }
 
     // Timer updates
     if (s.hasShield) {
@@ -693,6 +825,10 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
           );
           ctx.stroke();
         }
+      } else if (e.color === 'boss') {
+        // Boss explosion - purple/pink
+        outerColor = `rgba(138, 43, 226, ${alpha})`;
+        innerColor = `rgba(255, 20, 147, ${alpha * 0.7})`;
       } else {
         outerColor = `rgba(255, 100, 0, ${alpha})`;
         innerColor = `rgba(255, 255, 200, ${alpha * 0.5})`;
@@ -709,6 +845,54 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       ctx.fill();
       ctx.restore();
     });
+
+    // Draw boss
+    if (s.bossMode && s.boss) {
+      const boss = s.boss;
+      
+      ctx.save();
+      // Boss body - giant missile
+      ctx.fillStyle = '#ff0000';
+      ctx.beginPath();
+      ctx.arc(boss.x, boss.y, 50, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#cc0000';
+      ctx.beginPath();
+      ctx.arc(boss.x, boss.y, 35, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Boss eyes
+      ctx.fillStyle = '#ffff00';
+      ctx.beginPath();
+      ctx.arc(boss.x - 15, boss.y - 10, 8, 0, Math.PI * 2);
+      ctx.arc(boss.x + 15, boss.y - 10, 8, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(boss.x - 15, boss.y - 10, 4, 0, Math.PI * 2);
+      ctx.arc(boss.x + 15, boss.y - 10, 4, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.restore();
+      
+      // Boss health bar
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(boss.x - 60, boss.y - 70, 120, 10);
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(boss.x - 60, boss.y - 70, 120 * (boss.health / boss.maxHealth), 10);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(boss.x - 60, boss.y - 70, 120, 10);
+      
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 16px Rubik';
+      ctx.textAlign = 'center';
+      ctx.fillText('BOSS', boss.x, boss.y - 80);
+      ctx.restore();
+    }
 
     // Draw "תפתחו מנגלים" text
     if (s.showMangal) {

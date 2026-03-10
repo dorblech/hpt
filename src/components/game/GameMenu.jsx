@@ -1,10 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
+import { Trophy, Sparkles } from 'lucide-react';
 
 const LOGO_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69b06431da918bf146ec7aa5/c142c3bc8_image.png';
 
-export default function GameMenu({ onStart, highScore }) {
+export default function GameMenu({ onStart, highScore, coins, onShowAchievements, onShowUpgrades }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/70 backdrop-blur-sm">
       <motion.div 
@@ -46,11 +47,37 @@ export default function GameMenu({ onStart, highScore }) {
             🚀 התחל משחק
           </Button>
           
-          {highScore > 0 && (
-            <p className="text-accent font-rubik font-bold text-lg">
-              שיא: {highScore} נקודות
-            </p>
-          )}
+          <div className="flex gap-3">
+            <Button 
+              onClick={onShowAchievements}
+              variant="outline"
+              className="font-rubik font-bold"
+            >
+              <Trophy className="w-4 h-4 mr-2" />
+              הישגים
+            </Button>
+            <Button 
+              onClick={onShowUpgrades}
+              variant="outline"
+              className="font-rubik font-bold"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              שדרוגים
+            </Button>
+          </div>
+          
+          <div className="flex gap-4 items-center">
+            {highScore > 0 && (
+              <p className="text-accent font-rubik font-bold text-lg">
+                שיא: {highScore}
+              </p>
+            )}
+            {coins > 0 && (
+              <p className="text-yellow-400 font-rubik font-bold text-lg">
+                ⭐ {coins}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="text-sm text-muted-foreground font-rubik text-center mt-4 space-y-1">
