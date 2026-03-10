@@ -336,16 +336,24 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
         onLevelChange(levelConfig);
       }
       
-      // Boss every 5 levels
-      if ((newLevel + 1) % 5 === 0 && !s.bossMode) {
+      // Boss every level with increasing difficulty
+      if (!s.bossMode) {
+        const bossLevel = newLevel + 1;
+        const bossHealth = 5 + (bossLevel * 3); // 8, 11, 14, 17, 20, 23...
+        const bossSpeed = 1.5 + (bossLevel * 0.3); // Faster movement each level
+        const shootInterval = Math.max(30, 60 - (bossLevel * 5)); // Shoots more frequently
+        
         s.bossMode = true;
         s.boss = {
           x: W / 2,
           y: 100,
-          health: 10,
-          maxHealth: 10,
+          health: bossHealth,
+          maxHealth: bossHealth,
           direction: 1,
           shootTimer: 0,
+          speed: bossSpeed,
+          shootInterval: shootInterval,
+          level: bossLevel,
         };
       }
     }
@@ -522,23 +530,29 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     if (s.bossMode && s.boss) {
       const boss = s.boss;
       
-      // Boss movement
-      boss.x += boss.direction * 2;
+      // Boss movement - faster based on level
+      boss.x += boss.direction * boss.speed;
       if (boss.x < 100 || boss.x > W - 100) {
         boss.direction *= -1;
       }
       
-      // Boss shooting
+      // Boss shooting - more frequent based on level
       boss.shootTimer++;
-      if (boss.shootTimer >= 60) {
+      if (boss.shootTimer >= boss.shootInterval) {
         boss.shootTimer = 0;
-        s.missiles.push({
-          x: boss.x,
-          y: boss.y + 40,
-          speed: 2,
-          wobble: 0,
-          wobblePhase: 0,
-        });
+        
+        // Higher level bosses shoot multiple missiles
+        const missileCount = Math.min(Math.floor(boss.level / 2) + 1, 3);
+        for (let i = 0; i < missileCount; i++) {
+          const offsetX = (i - (missileCount - 1) / 2) * 40;
+          s.missiles.push({
+            x: boss.x + offsetX,
+            y: boss.y + 40,
+            speed: 2 + (boss.level * 0.2),
+            wobble: 0,
+            wobblePhase: 0,
+          });
+        }
       }
       
       // Check collision with balls
