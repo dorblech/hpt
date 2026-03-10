@@ -409,10 +409,32 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
             s.vintageTimer = GAME_CONFIG.VINTAGE_DURATION;
             onBonusChange({ hasShield: s.hasShield, hasVintage: true, shieldTimer: s.shieldTimer, vintageTimer: s.vintageTimer });
           } else if (bonus.type === 'luzon') {
-            // Destroy all missiles
-            s.missiles.forEach(m => {
-              s.explosions.push({ x: m.x, y: m.y, timer: 30, size: 50 });
+            // Destroy all missiles with radial explosion
+            const centerX = bonus.x;
+            const centerY = bonus.y;
+            
+            s.missiles.forEach((m, idx) => {
+              // Delayed radial explosion effect
+              setTimeout(() => {
+                s.explosions.push({ 
+                  x: m.x, 
+                  y: m.y, 
+                  timer: 40, 
+                  size: 60,
+                  color: 'luzon'
+                });
+              }, idx * 30);
             });
+            
+            // Giant central explosion
+            s.explosions.push({ 
+              x: centerX, 
+              y: centerY, 
+              timer: 60, 
+              size: 100,
+              color: 'luzon'
+            });
+            
             s.score += s.missiles.length * 10;
             onScoreChange(s.score);
             s.missiles = [];
@@ -648,13 +670,40 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     s.explosions.forEach(e => {
       ctx.save();
       const alpha = e.timer / 40;
-      const color = e.color === 'gold' ? `rgba(255, 200, 0, ${alpha})` : `rgba(255, 100, 0, ${alpha})`;
-      ctx.fillStyle = color;
+      
+      let outerColor, innerColor;
+      if (e.color === 'gold') {
+        outerColor = `rgba(255, 200, 0, ${alpha})`;
+        innerColor = `rgba(255, 255, 200, ${alpha * 0.5})`;
+      } else if (e.color === 'luzon') {
+        // Avi Luzon special radial explosion - red/orange/yellow
+        outerColor = `rgba(255, 60, 0, ${alpha})`;
+        innerColor = `rgba(255, 200, 0, ${alpha * 0.7})`;
+        
+        // Extra radial rays
+        ctx.strokeStyle = `rgba(255, 150, 0, ${alpha * 0.5})`;
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 8; i++) {
+          const angle = (Math.PI * 2 / 8) * i + s.frameCount * 0.1;
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y);
+          ctx.lineTo(
+            e.x + Math.cos(angle) * e.size * 1.5,
+            e.y + Math.sin(angle) * e.size * 1.5
+          );
+          ctx.stroke();
+        }
+      } else {
+        outerColor = `rgba(255, 100, 0, ${alpha})`;
+        innerColor = `rgba(255, 255, 200, ${alpha * 0.5})`;
+      }
+      
+      ctx.fillStyle = outerColor;
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
       ctx.fill();
       
-      ctx.fillStyle = `rgba(255, 255, 200, ${alpha * 0.5})`;
+      ctx.fillStyle = innerColor;
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.size * 0.5, 0, Math.PI * 2);
       ctx.fill();

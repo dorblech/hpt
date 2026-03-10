@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 
-const PLAYER_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/02a4af239_image.png';
+const LOGO_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69b06431da918bf146ec7aa5/c142c3bc8_image.png';
 
 export default function GameMenu({ onStart, highScore }) {
   return (
@@ -27,9 +27,9 @@ export default function GameMenu({ onStart, highScore }) {
         </p>
 
         <img 
-          src={PLAYER_IMG} 
-          alt="player" 
-          className="w-32 h-32 object-contain rounded-full border-4 border-blue-500 shadow-lg shadow-blue-500/30"
+          src={LOGO_IMG} 
+          alt="logo" 
+          className="w-48 h-48 object-contain"
         />
 
         <div className="flex flex-col items-center gap-3 mt-2">
