@@ -13,13 +13,19 @@ export default function GameMenu({ onStart, highScore }) {
         className="flex flex-col items-center gap-6 p-8"
       >
         <motion.h1 
-          className="text-5xl md:text-7xl font-rubik font-black text-white text-center"
+          className="text-4xl md:text-6xl font-rubik font-black text-white text-center"
           style={{ textShadow: '0 0 40px rgba(59,130,246,0.5), 0 4px 8px rgba(0,0,0,0.5)' }}
           animate={{ scale: [1, 1.03, 1] }}
           transition={{ repeat: Infinity, duration: 2 }}
         >
-          ⚽ כיפת הכדורגל ⚽
+          יאללה יאללה פ"ת
         </motion.h1>
+        <motion.h2 
+          className="text-2xl md:text-3xl font-rubik font-bold text-accent text-center -mt-2"
+          style={{ textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}
+        >
+          היום יוצאים למלחמה
+        </motion.h2>
         
         <p className="text-blue-300 font-rubik text-lg text-center max-w-md">
           הגן על האיצטדיון מפני הטילים!
