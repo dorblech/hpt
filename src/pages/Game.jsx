@@ -18,11 +18,13 @@ export default function Game() {
     shieldTimer: 0,
     vintageTimer: 0,
   });
+  const [currentLevel, setCurrentLevel] = useState(null);
 
   const handleStart = useCallback(() => {
     setScore(0);
     setLives(3);
     setBonuses({ hasShield: false, hasVintage: false, shieldTimer: 0, vintageTimer: 0 });
+    setCurrentLevel(null);
     setGameState('playing');
   }, []);
 
@@ -46,6 +48,10 @@ export default function Game() {
     setBonuses(newBonuses);
   }, []);
 
+  const handleLevelChange = useCallback((newLevel) => {
+    setCurrentLevel(newLevel);
+  }, []);
+
   return (
     <div className="fixed inset-0 bg-background overflow-hidden flex items-center justify-center">
       <div className="relative w-full h-full max-w-[600px]">
@@ -58,6 +64,7 @@ export default function Game() {
               hasVintage={bonuses.hasVintage}
               shieldTimer={bonuses.shieldTimer}
               vintageTimer={bonuses.vintageTimer}
+              currentLevel={currentLevel}
             />
             <GameCanvas
               gameState={gameState}
@@ -65,6 +72,7 @@ export default function Game() {
               onLivesChange={handleLivesChange}
               onGameOver={handleGameOver}
               onBonusChange={handleBonusChange}
+              onLevelChange={handleLevelChange}
             />
           </>
         )}

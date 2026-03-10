@@ -11,11 +11,6 @@ const LUZON_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/pu
 const GAME_CONFIG = {
   PLAYER_SPEED: 6,
   BALL_SPEED: 8,
-  MISSILE_BASE_SPEED: 2,
-  MISSILE_SPAWN_INTERVAL: 90,
-  BONUS_SPAWN_CHANCE: 0.15,
-  SHIELD_DURATION: 600,
-  VINTAGE_DURATION: 480,
   BALL_RADIUS: 8,
   VINTAGE_BALL_RADIUS: 16,
   MISSILE_WIDTH: 30,
@@ -24,7 +19,66 @@ const GAME_CONFIG = {
   PLAYER_HEIGHT: 100,
   BONUS_SIZE: 50,
   SHOOT_COOLDOWN: 12,
+  SHIELD_DURATION: 600,
+  VINTAGE_DURATION: 480,
 };
+
+// Level configurations
+const LEVELS = [
+  { 
+    level: 1, 
+    missileSpeed: 1.5, 
+    spawnInterval: 120, 
+    wobbleIntensity: 0.3, 
+    bonusChance: 0.2,
+    name: 'התחלה קלה'
+  },
+  { 
+    level: 2, 
+    missileSpeed: 2, 
+    spawnInterval: 100, 
+    wobbleIntensity: 0.5, 
+    bonusChance: 0.18,
+    name: 'התחממות'
+  },
+  { 
+    level: 3, 
+    missileSpeed: 2.5, 
+    spawnInterval: 80, 
+    wobbleIntensity: 0.8, 
+    bonusChance: 0.15,
+    name: 'קצב עולה'
+  },
+  { 
+    level: 4, 
+    missileSpeed: 3, 
+    spawnInterval: 65, 
+    wobbleIntensity: 1.2, 
+    bonusChance: 0.12,
+    name: 'אתגר אמיתי'
+  },
+  { 
+    level: 5, 
+    missileSpeed: 3.5, 
+    spawnInterval: 50, 
+    wobbleIntensity: 1.5, 
+    bonusChance: 0.1,
+    name: 'מטר טילים'
+  },
+  { 
+    level: 6, 
+    missileSpeed: 4, 
+    spawnInterval: 40, 
+    wobbleIntensity: 2, 
+    bonusChance: 0.08,
+    name: 'בלתי אפשרי'
+  },
+];
+
+function getLevelConfig(score) {
+  const levelIndex = Math.min(Math.floor(score / 100), LEVELS.length - 1);
+  return LEVELS[levelIndex];
+}
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -36,7 +90,7 @@ function loadImage(src) {
   });
 }
 
-export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, onBonusChange, gameState }) {
+export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, onBonusChange, onLevelChange, gameState }) {
   const canvasRef = useRef(null);
   const stateRef = useRef(null);
   const imagesRef = useRef({});
@@ -77,13 +131,15 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       vintageTimer: 0,
       spawnTimer: 0,
       shootCooldown: 0,
-      difficulty: 1,
       frameCount: 0,
       keys: {},
       showMangal: false,
       mangalTimer: 0,
       touching: false,
       touchX: 0,
+      currentLevel: 0,
+      kickAnimation: 0,
+      ballAtFoot: null,
     };
   }, [gameState, imagesLoaded]);
 
@@ -157,16 +213,17 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
 
   const shootBall = useCallback(() => {
     const s = stateRef.current;
-    if (!s || s.shootCooldown > 0) return;
+    if (!s || s.shootCooldown > 0 || s.kickAnimation > 0) return;
     
+    // Start kick animation
+    s.kickAnimation = 20;
     const radius = s.hasVintage ? GAME_CONFIG.VINTAGE_BALL_RADIUS : GAME_CONFIG.BALL_RADIUS;
-    s.balls.push({
+    s.ballAtFoot = {
       x: s.player.x,
-      y: s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 2,
+      y: s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 4,
       radius,
       isVintage: s.hasVintage,
-      speed: GAME_CONFIG.BALL_SPEED,
-    });
+    };
     s.shootCooldown = GAME_CONFIG.SHOOT_COOLDOWN;
   }, []);
 
@@ -216,16 +273,48 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     // Shoot cooldown
     if (s.shootCooldown > 0) s.shootCooldown--;
 
-    // Difficulty scaling
-    s.difficulty = 1 + Math.floor(s.score / 50) * 0.3;
+    // Kick animation
+    if (s.kickAnimation > 0) {
+      s.kickAnimation--;
+      if (s.kickAnimation === 10 && s.ballAtFoot) {
+        // Release ball at mid-kick
+        s.balls.push({
+          x: s.ballAtFoot.x,
+          y: s.ballAtFoot.y - 10,
+          radius: s.ballAtFoot.radius,
+          isVintage: s.ballAtFoot.isVintage,
+          speed: GAME_CONFIG.BALL_SPEED,
+        });
+        s.ballAtFoot = null;
+      }
+      if (s.kickAnimation === 0) {
+        s.ballAtFoot = null;
+      }
+    }
 
-    // Spawn missiles / bonuses
+    // Update ball at foot position
+    if (s.ballAtFoot) {
+      s.ballAtFoot.x = s.player.x;
+      s.ballAtFoot.y = s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 4;
+    }
+
+    // Level progression
+    const levelConfig = getLevelConfig(s.score);
+    const newLevel = levelConfig.level - 1;
+    if (newLevel !== s.currentLevel) {
+      s.currentLevel = newLevel;
+      if (onLevelChange) {
+        onLevelChange(levelConfig);
+      }
+    }
+
+    // Spawn missiles / bonuses based on level
+    const levelConfig = getLevelConfig(s.score);
     s.spawnTimer++;
-    const spawnInterval = Math.max(30, GAME_CONFIG.MISSILE_SPAWN_INTERVAL - s.difficulty * 8);
-    if (s.spawnTimer >= spawnInterval) {
+    if (s.spawnTimer >= levelConfig.spawnInterval) {
       s.spawnTimer = 0;
       
-      if (Math.random() < GAME_CONFIG.BONUS_SPAWN_CHANCE) {
+      if (Math.random() < levelConfig.bonusChance) {
         // Spawn bonus
         const bonusTypes = ['scarf', 'retro', 'luzon'];
         const type = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
@@ -236,12 +325,13 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
           speed: 2 + Math.random(),
         });
       } else {
-        // Spawn missile
+        // Spawn missile with level-based properties
         s.missiles.push({
           x: Math.random() * (W - 40) + 20,
           y: -GAME_CONFIG.MISSILE_HEIGHT,
-          speed: GAME_CONFIG.MISSILE_BASE_SPEED + Math.random() * s.difficulty,
-          wobble: Math.random() * 2 - 1,
+          speed: levelConfig.missileSpeed + Math.random() * 0.5,
+          wobble: (Math.random() * 2 - 1) * levelConfig.wobbleIntensity,
+          wobblePhase: Math.random() * Math.PI * 2,
         });
       }
     }
@@ -255,7 +345,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     // Update missiles
     s.missiles = s.missiles.filter(missile => {
       missile.y += missile.speed;
-      missile.x += Math.sin(s.frameCount * 0.05) * missile.wobble;
+      missile.x += Math.sin(s.frameCount * 0.05 + missile.wobblePhase) * missile.wobble;
 
       // Check collision with balls
       for (let i = s.balls.length - 1; i >= 0; i--) {
@@ -440,6 +530,42 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       }
     });
 
+    // Draw ball at foot (before kick)
+    if (s.ballAtFoot) {
+      const ball = s.ballAtFoot;
+      const kickProgress = 1 - (s.kickAnimation / 20);
+      const offsetY = kickProgress * 15;
+      
+      ctx.save();
+      if (ball.isVintage) {
+        ctx.fillStyle = '#d4a017';
+        ctx.strokeStyle = '#8b6914';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y - offsetY, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#8b6914';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y - offsetY, ball.radius * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y - offsetY, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y - offsetY, ball.radius * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // Draw balls
     s.balls.forEach(ball => {
       ctx.save();
@@ -476,7 +602,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       ctx.restore();
     });
 
-    // Draw player
+    // Draw player with kick animation
     if (imgs.player) {
       const pw = GAME_CONFIG.PLAYER_WIDTH;
       const ph = GAME_CONFIG.PLAYER_HEIGHT;
@@ -494,7 +620,29 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
         ctx.restore();
       }
 
-      ctx.drawImage(imgs.player, s.player.x - pw / 2, s.player.y - ph, pw, ph);
+      ctx.save();
+      
+      // Kick animation - tilt player slightly
+      if (s.kickAnimation > 0) {
+        const kickAngle = (s.kickAnimation > 10 ? (20 - s.kickAnimation) : s.kickAnimation) * 0.05;
+        ctx.translate(s.player.x, s.player.y - ph / 2);
+        ctx.rotate(kickAngle);
+        ctx.drawImage(imgs.player, -pw / 2, -ph / 2, pw, ph);
+        
+        // Draw kicking leg motion blur
+        if (s.kickAnimation > 8 && s.kickAnimation < 15) {
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.ellipse(0, ph / 4, 8, 20, Math.PI / 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      } else {
+        ctx.drawImage(imgs.player, s.player.x - pw / 2, s.player.y - ph, pw, ph);
+      }
+      
+      ctx.restore();
     }
 
     // Draw explosions
