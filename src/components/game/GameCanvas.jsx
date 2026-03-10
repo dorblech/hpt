@@ -3,7 +3,7 @@ import useGameLoop from './useGameLoop';
 
 // Image URLs
 const STADIUM_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/2f3681176_image.png';
-const PLAYER_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69b06431da918bf146ec7aa5/a39d126b9_image.png';
+const PLAYER_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69b06431da918bf146ec7aa5/e91ad0ca7_Gemini_Generated_Image_61sfuh61sfuh61sf.png';
 const SCARF_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/66fcc071c_image.png';
 const RETRO_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/d8bfe6ea0_image.png';
 const LUZON_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/a5e297469_image.png';
