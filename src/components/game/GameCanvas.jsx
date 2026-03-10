@@ -643,9 +643,6 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
 
       ctx.save();
       
-      // Set blend mode to remove black background
-      ctx.globalCompositeOperation = 'screen';
-      
       // Kick animation - tilt player slightly
       if (s.kickAnimation > 0) {
         const kickAngle = (s.kickAnimation > 10 ? (20 - s.kickAnimation) : s.kickAnimation) * 0.05;
@@ -665,9 +662,6 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
       } else {
         ctx.drawImage(imgs.player, s.player.x - pw / 2, s.player.y - ph, pw, ph);
       }
-      
-      // Reset blend mode
-      ctx.globalCompositeOperation = 'source-over';
       
       ctx.restore();
     }
