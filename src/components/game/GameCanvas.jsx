@@ -309,7 +309,6 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     }
 
     // Spawn missiles / bonuses based on level
-    const levelConfig = getLevelConfig(s.score);
     s.spawnTimer++;
     if (s.spawnTimer >= levelConfig.spawnInterval) {
       s.spawnTimer = 0;
