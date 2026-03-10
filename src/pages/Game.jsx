@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import GameCanvas from '../components/game/GameCanvas';
 import GameHUD from '../components/game/GameHUD';
 import GameMenu from '../components/game/GameMenu';

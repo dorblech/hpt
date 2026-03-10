@@ -2,8 +2,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 
-export default function GameOver({ score, highScore, onRestart }) {
+export default function GameOver({ score, highScore, onRestart, maxCombo }) {
   const isNewHigh = score >= highScore && score > 0;
+  const earnedCoins = Math.floor(score / 10);
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/80 backdrop-blur-sm">
@@ -28,6 +29,19 @@ export default function GameOver({ score, highScore, onRestart }) {
             </motion.p>
           )}
           <p className="text-muted-foreground font-rubik">שיא: {Math.max(score, highScore)}</p>
+          
+          <div className="flex gap-4 justify-center pt-2">
+            {maxCombo > 0 && (
+              <p className="text-orange-400 font-rubik font-bold">
+                🔥 קומבו: {maxCombo}
+              </p>
+            )}
+            {earnedCoins > 0 && (
+              <p className="text-yellow-400 font-rubik font-bold">
+                ⭐ +{earnedCoins}
+              </p>
+            )}
+          </div>
         </div>
 
         <Button 
