@@ -3,7 +3,7 @@ import useGameLoop from './useGameLoop';
 
 // Image URLs
 const STADIUM_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/2f3681176_image.png';
-const PLAYER_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/02a4af239_image.png';
+const PLAYER_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69b06431da918bf146ec7aa5/a39d126b9_image.png';
 const SCARF_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/66fcc071c_image.png';
 const RETRO_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/d8bfe6ea0_image.png';
 const LUZON_IMG = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/user_69a95f6464e92d6d7459eef2/a5e297469_image.png';
@@ -220,7 +220,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     const radius = s.hasVintage ? GAME_CONFIG.VINTAGE_BALL_RADIUS : GAME_CONFIG.BALL_RADIUS;
     s.ballAtFoot = {
       x: s.player.x,
-      y: s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 4,
+      y: s.player.y - 15, // Position at feet level
       radius,
       isVintage: s.hasVintage,
     };
@@ -295,7 +295,7 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
     // Update ball at foot position
     if (s.ballAtFoot) {
       s.ballAtFoot.x = s.player.x;
-      s.ballAtFoot.y = s.player.y - GAME_CONFIG.PLAYER_HEIGHT / 4;
+      s.ballAtFoot.y = s.player.y - 15; // Keep at feet level
     }
 
     // Level progression
