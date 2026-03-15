@@ -336,8 +336,8 @@ export default function GameCanvas({ onScoreChange, onLivesChange, onGameOver, o
         onLevelChange(levelConfig);
       }
       
-      // Boss every level with increasing difficulty
-      if (!s.bossMode) {
+      // Boss starts from level 2 (score 100+) with increasing difficulty
+      if (!s.bossMode && newLevel >= 1) {
         const bossLevel = newLevel + 1;
         const bossHealth = 5 + (bossLevel * 3); // 8, 11, 14, 17, 20, 23...
         const bossSpeed = 1.5 + (bossLevel * 0.3); // Faster movement each level
